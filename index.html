@@ -1,0 +1,174 @@
+<!doctype html>
+<html lang="es"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Hikari Editor</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icon-180.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Editor">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#0e2a33">
+<style>
+:root{--bg:#0e2a33;--pn:#153a46;--pn2:#1c4958;--tx:#eaf4f1;--mu:#93b3b5;--ac:#ffd166;--ink:#0e2a33;--bad:#ff8a7a}
+*{box-sizing:border-box}
+html{background:var(--bg)}
+body{margin:0;color:var(--tx);font:16px/1.4 ui-rounded,"SF Pro Rounded",-apple-system,system-ui,sans-serif;padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left)}
+main{max-width:560px;margin:0 auto;padding:16px 14px 40px}
+h1{font-size:24px;margin:4px 0 2px;letter-spacing:-.01em}
+h2{font-size:17px;margin:0 0 10px}
+p.s{margin:0 0 14px;color:var(--mu);font-size:14px}
+section{background:var(--pn);border-radius:16px;padding:14px;margin:0 0 14px}
+button,select,input,textarea{font:inherit;color:inherit}
+button{background:var(--pn2);border:0;border-radius:12px;padding:10px 14px;min-height:44px;cursor:pointer}
+button.p{background:var(--ac);color:var(--ink);font-weight:700;width:100%}
+button:disabled{opacity:.5}
+button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{outline:3px solid var(--ac);outline-offset:2px}
+input[type=text],textarea,select,input[type=number]{width:100%;background:var(--bg);border:1px solid var(--pn2);border-radius:10px;padding:10px;min-height:44px}
+input[type=color]{width:56px;height:44px;border:0;background:none;padding:0}
+input[type=range]{width:100%;accent-color:var(--ac)}
+.r{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.r>*{flex:0 0 auto}.r .f{flex:1 1 0;min-width:0}
+.seg button{flex:1;background:var(--bg)}
+.seg button.on{background:var(--ac);color:var(--ink);font-weight:700}
+.clip{background:var(--bg);border-radius:10px;padding:10px 10px 10px 22px;margin:0 0 8px;position:relative;
+ background-image:repeating-linear-gradient(to bottom,var(--pn2) 0 6px,transparent 6px 14px);background-size:6px 100%;background-repeat:no-repeat;background-position:7px 0}
+.clip b,.clip small{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:block}
+.clip small,.mu{color:var(--mu);font-size:13px}
+.tx{background:var(--bg);border-radius:10px;padding:10px;margin:0 0 8px}
+label.l{display:block;font-size:13px;color:var(--mu);margin:8px 0 4px}
+canvas#pv{width:100%;max-height:58vh;object-fit:contain;background:#000;border-radius:12px;display:block;margin:0 auto}
+.warn{color:var(--bad);font-size:14px;margin:8px 0 0}
+video#out{width:100%;max-height:50vh;border-radius:12px;margin:10px 0;background:#000}
+.bar{height:8px;background:var(--bg);border-radius:6px;overflow:hidden;margin:10px 0 6px}
+.bar i{display:block;height:100%;width:0;background:var(--ac)}
+</style></head><body><main>
+<h1>Hikari Editor</h1>
+<p class="s">Une clips, pon texto y exporta. Todo se hace en tu iPhone: tus videos no se suben a ningún sitio.</p>
+
+<section><h2>1. Clips</h2>
+<input id="f" type="file" accept="video/*" multiple hidden>
+<button onclick="f.click()">Añadir videos</button>
+<div id="cl" style="margin-top:10px"></div>
+<div id="tot" class="mu"></div><div id="wn" class="warn"></div></section>
+
+<section><h2>2. Formato</h2>
+<div class="r seg" id="rt"></div>
+<div class="r" style="margin-top:10px"><div class="f"><label class="l">Cómo encaja el video</label>
+<select id="fit"><option value="contain">Entero, con bandas</option><option value="cover">Llenar, recortando</option></select></div>
+<div><label class="l">Bandas</label><input id="bg" type="color" value="#000000"></div></div></section>
+
+<section><h2>3. Texto</h2>
+<button id="addt">Añadir texto</button><div id="tl" style="margin-top:10px"></div></section>
+
+<section><h2>Vista previa</h2>
+<canvas id="pv" width="720" height="1280"></canvas>
+<label class="l">Segundo a mostrar: <span id="ptl">0</span> s</label>
+<input id="pt" type="range" min="0" max="0" step="0.1" value="0"></section>
+
+<section><h2>4. Exportar</h2>
+<button class="p" id="ex" disabled>Exportar video</button>
+<div class="bar" hidden id="bar"><i id="bi"></i></div><div id="st" class="mu"></div>
+<div id="res" hidden><video id="out" controls playsinline></video>
+<div class="r"><button class="p f" id="sh">Guardar o compartir</button><button id="dl">Descargar</button></div></div>
+<p class="mu">Durante la exportación mantén la pantalla encendida y esta pestaña a la vista. Si sales de Safari, se interrumpe.</p></section>
+</main>
+<script>
+const $=s=>document.querySelector(s),esc=s=>s.replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const SZ={'9:16':[720,1280],'1:1':[720,720],'16:9':[1280,720],'4:5':[720,900]};
+let clips=[],texts=[],ratio='9:16',blob=null,ext='mp4',busy=false,tok=0;
+const AC=new (window.AudioContext||window.webkitAudioContext)(),pv=$('#pv');
+const fmt=s=>Math.floor(s/60)+':'+String(Math.round(s%60)).padStart(2,'0');
+const total=()=>clips.reduce((a,c)=>a+c.dur,0);
+
+function seek(v,t){return new Promise(r=>{if(Math.abs(v.currentTime-t)<.02)return r();let d=false;const f=()=>{if(d)return;d=true;v.removeEventListener('seeked',f);r()};v.addEventListener('seeked',f);v.currentTime=t;setTimeout(f,900)})}
+function wrap(x,t,m){const o=[];for(const p of t.split('\n')){let l='';for(const w of p.split(' ')){const n=l?l+' '+w:w;if(x.measureText(n).width>m&&l){o.push(l);l=w}else l=n}o.push(l)}return o}
+function draw(c,v,t){const [W,H]=SZ[ratio],x=c.getContext('2d');x.fillStyle=$('#bg').value;x.fillRect(0,0,W,H);
+ if(v&&v.videoWidth){const s=($('#fit').value=='cover'?Math.max:Math.min)(W/v.videoWidth,H/v.videoHeight),w=v.videoWidth*s,h=v.videoHeight*s;x.drawImage(v,(W-w)/2,(H-h)/2,w,h)}
+ for(const o of texts){if(!o.t.trim()||t<o.a||t>o.b)continue;const fs=W*o.s/100;
+  x.font=`700 ${fs}px ui-rounded,-apple-system,Helvetica,Arial,sans-serif`;x.textAlign='center';x.textBaseline='middle';x.lineJoin='round';x.lineWidth=fs/6;x.strokeStyle='#000';x.fillStyle=o.c;
+  const L=wrap(x,o.t,W*.9),lh=fs*1.2,y0={top:.12,mid:.5,bot:.88}[o.p]*H-(L.length-1)*lh/2;
+  L.forEach((l,i)=>{x.strokeText(l,W/2,y0+i*lh);x.fillText(l,W/2,y0+i*lh)})}}
+async function preview(){if(busy)return;const k=++tok,[W,H]=SZ[ratio];pv.width=W;pv.height=H;
+ if(!clips.length)return draw(pv,null,0);
+ const t=+$('#pt').value;$('#ptl').textContent=t.toFixed(1);let acc=0,c=clips[0];
+ for(const q of clips){c=q;if(t<acc+q.dur)break;acc+=q.dur}
+ await seek(c.v,Math.min(Math.max(t-acc,0),Math.max(c.dur-.05,0)));if(k===tok)draw(pv,c.v,t)}
+
+$('#rt').innerHTML=Object.keys(SZ).map(k=>`<button data-k="${k}" class="${k==ratio?'on':''}">${k}</button>`).join('');
+$('#rt').onclick=e=>{const k=e.target.dataset.k;if(!k)return;ratio=k;[...$('#rt').children].forEach(b=>b.classList.toggle('on',b.dataset.k==k));preview()};
+$('#fit').onchange=$('#bg').oninput=preview;$('#pt').oninput=preview;
+
+$('#f').onchange=async e=>{const bad=[];
+ for(const f of e.target.files){const v=document.createElement('video');v.playsInline=true;v.preload='auto';v.src=URL.createObjectURL(f);
+  await new Promise(r=>{v.onloadedmetadata=r;v.onerror=r});
+  if(!isFinite(v.duration)||!v.duration){bad.push(f.name);continue}
+  const g=AC.createGain();AC.createMediaElementSource(v).connect(g);
+  clips.push({name:f.name,size:f.size,v,g,vol:1,dur:v.duration})}
+ e.target.value='';if(bad.length)alert('Safari no pudo leer: '+bad.join(', '));render();preview()};
+
+function render(){const L=$('#cl');L.innerHTML='';
+ clips.forEach((c,i)=>{const d=document.createElement('div');d.className='clip';
+  d.innerHTML=`<b>${i+1}. ${esc(c.name)}</b><small>${fmt(c.dur)} · ${(c.size/1048576).toFixed(0)} MB</small>
+  <div class="r" style="margin-top:6px"><button>↑</button><button>↓</button><button>Quitar</button><div class="f"><label class="l" style="margin:0">Volumen ${Math.round(c.vol*100)}%</label><input type="range" min="0" max="2" step="0.05" value="${c.vol}"></div></div>`;
+  const [u,dn,rm]=d.querySelectorAll('button'),rg=d.querySelector('input'),lb=d.querySelector('label');
+  u.onclick=()=>{if(i){[clips[i-1],clips[i]]=[clips[i],clips[i-1]];render();preview()}};
+  dn.onclick=()=>{if(i<clips.length-1){[clips[i+1],clips[i]]=[clips[i],clips[i+1]];render();preview()}};
+  rm.onclick=()=>{clips.splice(i,1);render();preview()};
+  rg.oninput=()=>{c.vol=+rg.value;lb.textContent='Volumen '+Math.round(c.vol*100)+'%'};
+  L.append(d)});
+ const t=total();$('#pt').max=Math.max(t-.1,0).toFixed(1);$('#tot').textContent=clips.length?`Duración total: ${fmt(t)}`:'Aún no hay videos.';
+ const big=clips.some(c=>c.size>600*1048576);
+ $('#wn').textContent=t>300||big?'Aviso: con más de 5 min o archivos de más de 600 MB Safari puede cerrarse. Prueba con partes más cortas.':'';
+ $('#ex').disabled=!clips.length}
+
+function rtx(){const L=$('#tl');L.innerHTML='';
+ texts.forEach((o,i)=>{const d=document.createElement('div');d.className='tx';
+  d.innerHTML=`<textarea rows="2" placeholder="Escribe el texto">${esc(o.t)}</textarea>
+  <div class="r"><div class="f"><label class="l">Tamaño</label><input type="range" min="3" max="14" step="0.5" value="${o.s}"></div><div><label class="l">Color</label><input type="color" value="${o.c}"></div></div>
+  <div class="r"><div class="f"><label class="l">Posición</label><select><option value="top">Arriba</option><option value="mid">Centro</option><option value="bot">Abajo</option></select></div>
+  <div class="f"><label class="l">Desde (s)</label><input type="number" min="0" step="0.5" value="${o.a}"></div><div class="f"><label class="l">Hasta (s)</label><input type="number" min="0" step="0.5" value="${o.b}"></div></div>
+  <button style="margin-top:8px">Quitar texto</button>`;
+  const [ta,sz,co,po,a,b]=d.querySelectorAll('textarea,input,select');d.querySelector('select').value=o.p;
+  ta.oninput=()=>{o.t=ta.value;preview()};sz.oninput=()=>{o.s=+sz.value;preview()};co.oninput=()=>{o.c=co.value;preview()};
+  po.onchange=()=>{o.p=po.value;preview()};a.oninput=()=>{o.a=+a.value||0;preview()};b.oninput=()=>{o.b=+b.value||0;preview()};
+  d.querySelector('button').onclick=()=>{texts.splice(i,1);rtx();preview()};L.append(d)})}
+$('#addt').onclick=()=>{texts.push({t:'',s:7,c:'#ffffff',p:'bot',a:0,b:Math.max(Math.ceil(total()),5)});rtx()};
+
+$('#ex').onclick=()=>exportV();
+async function exportV(){if(busy||!clips.length)return;
+ if(!window.MediaRecorder){alert('Este Safari no permite grabar video desde la web. Actualiza iOS.');return}
+ busy=true;$('#ex').disabled=true;$('#res').hidden=true;
+ AC.resume();clips.forEach(c=>{c.v.muted=false;c.v.play().then(()=>c.v.pause()).catch(()=>{})}); // desbloqueo por gesto
+ const [W,H]=SZ[ratio],cv=document.createElement('canvas');cv.width=W;cv.height=H;
+ const dest=AC.createMediaStreamDestination();clips.forEach(c=>{c.g.gain.value=c.vol;c.g.connect(dest)});
+ const st=cv.captureStream(30);dest.stream.getAudioTracks().forEach(t=>st.addTrack(t));
+ const mt=['video/mp4;codecs=avc1','video/mp4','video/webm;codecs=vp9,opus','video/webm'].find(m=>MediaRecorder.isTypeSupported(m))||'';
+ ext=mt.includes('mp4')?'mp4':'webm';let wl=null;
+ try{
+  const rec=new MediaRecorder(st,{mimeType:mt,videoBitsPerSecond:5e6}),ch=[];
+  rec.ondataavailable=e=>e.data.size&&ch.push(e.data);const done=new Promise(r=>rec.onstop=r);
+  try{wl=await navigator.wakeLock.request('screen')}catch(e){}
+  $('#bar').hidden=false;const T=total();let acc=0;
+  await Promise.all(clips.map(c=>seek(c.v,0)));draw(cv,clips[0].v,0);rec.start(1000);
+  for(const [i,c] of clips.entries()){
+   await seek(c.v,0);await c.v.play();
+   await new Promise(res=>{const tick=()=>{const t=acc+c.v.currentTime;draw(cv,c.v,t);
+    $('#bi').style.width=(100*t/T)+'%';$('#st').textContent=`Procesando clip ${i+1} de ${clips.length} · ${Math.round(100*t/T)}%`;
+    if(c.v.ended||c.v.paused||c.v.currentTime>=c.dur-.04)return res();requestAnimationFrame(tick)};tick()});
+   c.v.pause();acc+=c.dur}
+  rec.stop();await done;
+  blob=new Blob(ch,{type:(mt||'video/mp4').split(';')[0]});
+  $('#out').src=URL.createObjectURL(blob);$('#res').hidden=false;
+  $('#st').textContent=`Listo (${(blob.size/1048576).toFixed(1)} MB, ${ext.toUpperCase()}). Toca «Guardar o compartir» y elige «Guardar video».`;
+ }catch(e){$('#st').textContent='No se pudo exportar: '+(e.message||e)+'. Prueba con menos clips o más cortos.'}
+ clips.forEach(c=>{try{c.g.disconnect(dest)}catch(e){}});try{wl&&wl.release()}catch(e){}
+ busy=false;$('#ex').disabled=false;preview()}
+
+const file=()=>new File([blob],'video-editado.'+ext,{type:blob.type});
+$('#sh').onclick=async()=>{if(!blob)return;const f=file();
+ if(navigator.canShare&&navigator.canShare({files:[f]})){try{await navigator.share({files:[f]})}catch(e){}}else $('#dl').click()};
+$('#dl').onclick=()=>{if(!blob)return;const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='video-editado.'+ext;a.click()};
+if('serviceWorker'in navigator&&location.protocol==='https:')navigator.serviceWorker.register('sw.js').catch(()=>{});
+render();preview();
+</script></body></html>
